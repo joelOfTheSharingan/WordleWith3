@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>3-Letter Wordle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 30px;
+      background: #f4f4f4;
+    }
+
+    h1 {
+      font-size: 36px;
+    }
+
+    #game-board {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(6, 60px);
+      gap: 10px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+
+    .tile {
+      width: 60px;
+      height: 60px;
+      border: 2px solid #ccc;
+      font-size: 32px;
+      text-align: center;
+      line-height: 60px;
+      font-weight: bold;
+      border-radius: 10px;
+      background-color: white;
+    }
+
+    .correct { background-color: green; color: white; }
+    .present { background-color: gold; color: white; }
+    .absent { background-color: #777; color: white; }
+
+    #keyboard {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .key-row { margin: 5px; display: flex; justify-content: center; gap: 4px; flex-wrap: nowrap; }
+    .key {
+      padding: 10px 12px;
+      font-size: 18px;
+      border-radius: 6px;
+      border: none;
+      background-color: #ddd;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #quit-button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border-radius: 8px;
+      background-color: #ff4d4d;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    @media (max-width: 400px) {
+  h1 {
+    font-size: 36px;
+    text-align: center;
+    margin-bottom: 15px;
+  }
+
+  #game-board {
+    transform: scale(0.7);
+    transform-origin: top center;
+    margin-top: 0px;
+    margin-bottom: -70px;
+  }
+
+  #keyboard {
+    transform: scale(0.87);
+    transform-origin: top center;
+    margin-top: 0px;
+    margin-bottom: 0px;
+  }
+
+  #quit-button {
+    transform: scale(0.8);
+    margin-top: 10px;
+  }
+
+  .key {
+    font-size: 16px;
+    padding: 8px 10px;
+  }
+
+  .key-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: nowrap;  /* prevent wrapping */
+    gap: 4px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+}
+
+  </style>
+</head>
+<body>
+<h1>Mini Wordle</h1>
+<div id="game-board"></div>
+
+<div id="keyboard">
+  <div class="key-row">
+    <button class="key">Q</button><button class="key">W</button><button class="key">E</button>
+    <button class="key">R</button><button class="key">T</button><button class="key">Y</button>
+    <button class="key">U</button><button class="key">I</button><button class="key">O</button>
+    <button class="key">P</button>
+  </div>
+  <div class="key-row">
+    <button class="key">A</button><button class="key">S</button><button class="key">D</button>
+    <button class="key">F</button><button class="key">G</button><button class="key">H</button>
+    <button class="key">J</button><button class="key">K</button><button class="key">L</button>
+  </div>
+  <div class="key-row">
+    <button class="key">Enter</button>
+    <button class="key">Z</button><button class="key">X</button><button class="key">C</button>
+    <button class="key">V</button><button class="key">B</button><button class="key">N</button>
+    <button class="key">M</button>
+    <button class="key">Del</button>
+  </div>
+</div>
+
+<button id="quit-button">Quit</button>
+
+<script>
+(function () {
+  const WORD_LENGTH = 3;
+  const MAX_ROWS = 6;
+
+  let targetWord = "";
+  let currentGuess = "";
+  let currentRow = 0;
+  let gameReady = false;
+  let dictionary = [];
+
+  fetch('words3.txt')
+    .then(res => res.text())
+    .then(text => {
+      dictionary = text.split('\n')
+        .map(w => w.trim().toUpperCase())
+        .filter(w => w.length === WORD_LENGTH);
+      targetWord = dictionary[Math.floor(Math.random() * dictionary.length)];
+      gameReady = true;
+    });
+
+  const board = document.getElementById("game-board");
+
+  for (let i = 0; i < WORD_LENGTH * MAX_ROWS; i++) {
+    const tile = document.createElement("div");
+    tile.classList.add("tile");
+    tile.id = "tile-" + i;
+    board.appendChild(tile);
+  }
+
+  document.querySelectorAll(".key").forEach(btn =>
+    btn.addEventListener("click", () => handleKey(btn.innerText))
+  );
+
+  document.getElementById("quit-button").addEventListener("click", () => {
+    alert("Game quit. The word was: " + targetWord);
+    location.reload();
+  });
+
+  function handleKey(key) {
+    if (!gameReady) return;
+
+    if (key === "Del") {
+      currentGuess = currentGuess.slice(0, -1);
+      updateTiles();
+    } else if (key === "Enter") {
+      if (currentGuess.length === WORD_LENGTH) {
+        const guessUpper = currentGuess.toUpperCase();
+        if (!dictionary.includes(guessUpper)) {
+          alert("❗ Word not found in dictionary");
+          return;
+        }
+        checkGuess();
+        currentGuess = "";
+        currentRow++;
+      }
+    } else if (currentGuess.length < WORD_LENGTH && /^[A-Z]$/.test(key)) {
+      currentGuess += key;
+      updateTiles();
+    }
+  }
+
+  function updateTiles() {
+    for (let i = 0; i < WORD_LENGTH; i++) {
+      const tile = document.getElementById("tile-" + (currentRow * WORD_LENGTH + i));
+      tile.innerText = currentGuess[i] || "";
+    }
+  }
+
+  function checkGuess() {
+    const guess = currentGuess.toUpperCase();
+    let correctCount = 0;
+
+    for (let i = 0; i < WORD_LENGTH; i++) {
+      const letter = guess[i];
+      const tile = document.getElementById("tile-" + (currentRow * WORD_LENGTH + i));
+      tile.classList.remove("correct", "present", "absent");
+
+      const keyButton = [...document.querySelectorAll('.key')].find(btn => btn.innerText === letter);
+
+      if (letter === targetWord[i]) {
+        tile.classList.add("correct");
+        correctCount++;
+        colorKey(keyButton, "correct");
+      } else if (targetWord.includes(letter)) {
+        tile.classList.add("present");
+        colorKey(keyButton, "present");
+      } else {
+        tile.classList.add("absent");
+        colorKey(keyButton, "absent");
+      }
+    }
+
+    if (correctCount === WORD_LENGTH) {
+      setTimeout(() => {
+        alert("🎉 You win!");
+        location.reload();
+      }, 100);
+    } else if (currentRow === MAX_ROWS - 1) {
+      setTimeout(() => {
+        alert("❌ Game over! The word was: " + targetWord);
+        location.reload();
+      }, 100);
+    }
+  }
+
+  function colorKey(keyBtn, status) {
+    if (!keyBtn) return;
+    if (status === "correct") {
+      keyBtn.style.backgroundColor = "green";
+      keyBtn.style.color = "white";
+    } else if (status === "present" && keyBtn.style.backgroundColor !== "green") {
+      keyBtn.style.backgroundColor = "gold";
+      keyBtn.style.color = "white";
+    } else if (status === "absent" && keyBtn.style.backgroundColor !== "green" && keyBtn.style.backgroundColor !== "gold") {
+      keyBtn.style.backgroundColor = "#777";
+      keyBtn.style.color = "white";
+    }
+  }
+})();
+</script>
+</body>
+</html>
